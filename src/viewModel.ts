@@ -1,9 +1,10 @@
-import { cloneScenario, summarizeScenario, validateDevice, validateScenarioSettings } from './domain';
+import { appendSimulationRecord, cloneScenario, createSimulationRecord, summarizeScenario, validateDevice, validateScenarioSettings } from './domain';
 import { findScenario, type EnergyRepository } from './repository';
-import type { EnergyDevice, EnergyDocument, EnergyScenario, Notice, ViewStatus } from './types';
+import type { EnergyDevice, EnergyDocument, EnergyScenario, Notice, SimulationRecord, ViewStatus } from './types';
 
 export interface EnergyLensState {
   document: EnergyDocument | null;
+  records: SimulationRecord[];
   status: ViewStatus;
   notice: Notice | null;
 }
@@ -11,7 +12,7 @@ export interface EnergyLensState {
 type Listener = (state: EnergyLensState) => void;
 
 export class EnergyLensViewModel {
-  private state: EnergyLensState = { document: null, status: 'loading', notice: null };
+  private state: EnergyLensState = { document: null, records: [], status: 'loading', notice: null };
   private readonly listeners = new Set<Listener>();
 
   constructor(private readonly repository: EnergyRepository) {}
@@ -25,9 +26,16 @@ export class EnergyLensViewModel {
 
   initialize(): void {
     try {
-      this.state = { document: this.repository.load(), status: 'ready', notice: null };
+      // 记录读取失败不应影响方案本体：读不到就当作还没有任何记录
+      let records: SimulationRecord[] = [];
+      try {
+        records = this.repository.loadRecords();
+      } catch {
+        records = [];
+      }
+      this.state = { document: this.repository.load(), records, status: 'ready', notice: null };
     } catch {
-      this.state = { document: null, status: 'error', notice: { kind: 'error', text: '本地数据读取失败，请刷新重试' } };
+      this.state = { document: null, records: [], status: 'error', notice: { kind: 'error', text: '本地数据读取失败，请刷新重试' } };
     }
     this.emit();
   }
@@ -98,7 +106,17 @@ export class EnergyLensViewModel {
   }
 
   complete(): void {
-    this.state = { ...this.state, status: 'completed', notice: { kind: 'success', text: '本次推演已保存，可随时回来继续调整' } };
+    const scenario = this.activeScenario;
+    if (!scenario) return;
+    const record = createSimulationRecord(scenario);
+    try {
+      const records = appendSimulationRecord(this.state.records, record);
+      this.repository.saveRecords(records);
+      this.state = { ...this.state, records, status: 'completed', notice: { kind: 'success', text: `本次推演已存为记录（第 ${records.length} 份），可随时回看或对比` } };
+    } catch {
+      // 记录落盘失败不改变方案本体与原有的完成状态
+      this.state = { ...this.state, status: 'error', notice: { kind: 'error', text: '记录保存失败，当前推演结果仍可在页面查看' } };
+    }
     this.emit();
   }
 
@@ -111,7 +129,7 @@ export class EnergyLensViewModel {
   private persist(document: EnergyDocument, notice: string): void {
     try {
       this.repository.save(document);
-      this.state = { document, status: 'editing', notice: { kind: 'success', text: notice } };
+      this.state = { ...this.state, document, status: 'editing', notice: { kind: 'success', text: notice } };
     } catch {
       this.state = { ...this.state, status: 'error', notice: { kind: 'error', text: '保存失败，当前页面仍可继续编辑' } };
     }

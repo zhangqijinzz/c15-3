@@ -1,10 +1,13 @@
 import { exampleScenario } from './domain';
 import { readDocument, writeDocument } from './services/storageService';
-import type { EnergyDocument, EnergyScenario } from './types';
+import { readRecords, writeRecords } from './services/recordsStorage';
+import type { EnergyDocument, EnergyScenario, SimulationRecord } from './types';
 
 export interface EnergyRepository {
   load(): EnergyDocument;
   save(document: EnergyDocument): void;
+  loadRecords(): SimulationRecord[];
+  saveRecords(records: readonly SimulationRecord[]): void;
 }
 
 export class LocalEnergyRepository implements EnergyRepository {
@@ -19,6 +22,14 @@ export class LocalEnergyRepository implements EnergyRepository {
 
   save(document: EnergyDocument): void {
     writeDocument(document);
+  }
+
+  loadRecords(): SimulationRecord[] {
+    return readRecords();
+  }
+
+  saveRecords(records: readonly SimulationRecord[]): void {
+    writeRecords(records);
   }
 }
 
