@@ -1,4 +1,4 @@
-import type { EnergyDocument } from '../types';
+import type { DeductionRecord, EnergyDocument } from '../types';
 
 const STORAGE_KEY = 'energy-lens.document.v1';
 
@@ -8,7 +8,7 @@ export function readDocument(): EnergyDocument | null {
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isDocument(parsed)) return null;
-    return parsed;
+    return { ...parsed, records: sanitizeRecords(parsed.records) };
   } catch {
     return null;
   }
@@ -55,4 +55,33 @@ function isDevice(value: unknown): value is EnergyDocument['scenarios'][number][
     && typeof device.dailyHours === 'number'
     && device.dailyHours >= 0
     && device.dailyHours <= 24;
+}
+
+function sanitizeRecords(value: unknown): DeductionRecord[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function isRecord(value: unknown): value is DeductionRecord {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Partial<DeductionRecord>;
+  return typeof record.id === 'string'
+    && typeof record.scenarioId === 'string'
+    && typeof record.scenarioName === 'string'
+    && typeof record.createdAt === 'string'
+    && typeof record.pricePerKwh === 'number'
+    && record.pricePerKwh >= 0
+    && typeof record.daysPerMonth === 'number'
+    && record.daysPerMonth >= 1
+    && record.daysPerMonth <= 31
+    && Array.isArray(record.devices)
+    && record.devices.every(isDevice)
+    && isEstimate(record.total);
+}
+
+function isEstimate(value: unknown): value is DeductionRecord['total'] {
+  if (!value || typeof value !== 'object') return false;
+  const total = value as Partial<DeductionRecord['total']>;
+  return typeof total.dailyKwh === 'number' && Number.isFinite(total.dailyKwh)
+    && typeof total.monthlyKwh === 'number' && Number.isFinite(total.monthlyKwh)
+    && typeof total.monthlyCost === 'number' && Number.isFinite(total.monthlyCost);
 }

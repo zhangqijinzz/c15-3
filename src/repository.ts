@@ -11,7 +11,7 @@ export class LocalEnergyRepository implements EnergyRepository {
   load(): EnergyDocument {
     const saved = readDocument();
     if (!saved || saved.scenarios.length === 0) {
-      return { version: 1, scenarios: [exampleScenario], activeScenarioId: exampleScenario.id };
+      return { version: 1, scenarios: [exampleScenario], activeScenarioId: exampleScenario.id, records: [] };
     }
     const activeExists = saved.scenarios.some((scenario) => scenario.id === saved.activeScenarioId);
     return activeExists ? saved : { ...saved, activeScenarioId: saved.scenarios[0].id };

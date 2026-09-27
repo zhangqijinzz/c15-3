@@ -14,10 +14,34 @@ export interface EnergyScenario {
   createdAt: string;
 }
 
+export interface DeductionRecord {
+  id: string;
+  scenarioId: string;
+  scenarioName: string;
+  createdAt: string;
+  pricePerKwh: number;
+  daysPerMonth: number;
+  devices: EnergyDevice[];
+  total: EnergyEstimate;
+}
+
+export interface RecordComparison {
+  base: DeductionRecord;
+  target: DeductionRecord;
+  deltaDailyKwh: number;
+  deltaMonthlyKwh: number;
+  deltaMonthlyCost: number;
+  addedDevices: EnergyDevice[];
+  removedDevices: EnergyDevice[];
+  changedDevices: Array<{ before: EnergyDevice; after: EnergyDevice }>;
+  unchangedCount: number;
+}
+
 export interface EnergyDocument {
   version: 1;
   scenarios: EnergyScenario[];
   activeScenarioId: string;
+  records?: DeductionRecord[];
 }
 
 export type ViewStatus = 'loading' | 'ready' | 'editing' | 'error' | 'completed';
